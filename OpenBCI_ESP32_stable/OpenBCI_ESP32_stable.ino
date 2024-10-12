@@ -6,6 +6,7 @@
 #include <ESPmDNS.h>
 
 #include <ArduinoJson.h>
+#include <HTTPClient.h>
 
 #define ADS1299_PIN_RESET 17
 #define ADS1299_PIN_DRDY 25
@@ -24,6 +25,8 @@
 #define SOFT_AP_PASSWORD "abcd1234*"
 
 #define JSON_BUFFER_SIZE 1024
+
+#define SERVER_URL "http://10.153.213.202"  // 替换为您的服务器URL
 
 enum ads1299_command : uint8_t        //ADS1299控制字：
 {
@@ -489,38 +492,43 @@ void setup()
     
     delayMicroseconds(50);
 
-    WiFi.mode(WIFI_AP);
-    WiFi.softAP(SOFT_AP_SSID, SOFT_AP_PASSWORD);
+    WiFi.mode(WIFI_STA);
+    WiFi.begin("areyouok", "wpc990601");
+
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
       
     delay(250);
       
-    WiFi.softAPConfig(local_ip, network_gateway, subnet_mask);//配为AP
+    // WiFi.softAPConfig(local_ip, network_gateway, subnet_mask);//配为AP
       
     delay(250);
 
-    MDNS.begin("openbci");//使用提供的主机名“openbci”初始化mDNS（组播DNS）。mDNS允许本地网络上的设备使用主机名而不是IP地址来发现彼此
+    // MDNS.begin("openbci");//使用提供的主机名“openbci”初始化mDNS（组播DNS）。mDNS允许本地网络上的设备使用主机名而不是IP地址来发现彼此
     
-    tcp_transfer_buffer = (uint8_t*)malloc(sizeof(openbci_data_buffer));
+    // tcp_transfer_buffer = (uint8_t*)malloc(sizeof(openbci_data_buffer));
 
-    web_server.on("/all", HTTP_GET, get_system_info);
-    web_server.on("/board", HTTP_GET, get_board_info);
+    // web_server.on("/all", HTTP_GET, get_system_info);
+    // web_server.on("/board", HTTP_GET, get_board_info);
 
-    web_server.on("/command", HTTP_POST, process_command);
+    // web_server.on("/command", HTTP_POST, process_command);
       
-    web_server.on("/stream/start", HTTP_GET, start_streaming);
-    web_server.on("/stream/stop", HTTP_GET, stop_streaming);
+    // web_server.on("/stream/start", HTTP_GET, start_streaming);
+    // web_server.on("/stream/stop", HTTP_GET, stop_streaming);
 
-    web_server.on("/output/raw", HTTP_GET, switch_raw_output);
+    // web_server.on("/output/raw", HTTP_GET, switch_raw_output);
     
-    web_server.on("/tcp", HTTP_GET, get_tcp_config);
-    web_server.on("/tcp", HTTP_POST, set_tcp_config);
-    web_server.on("/tcp", HTTP_DELETE, stop_tcp_connection);
+    // web_server.on("/tcp", HTTP_GET, get_tcp_config);
+    // web_server.on("/tcp", HTTP_POST, set_tcp_config);
+    // web_server.on("/tcp", HTTP_DELETE, stop_tcp_connection);
     
-    web_server.onNotFound(invalid_request);
+    // web_server.onNotFound(invalid_request);
       
-    MDNS.addService("http", "tcp", 80);//这为"HTTP"服务添加了一个mDNS服务，使用TCP协议在端口80上，使其他设备能够在网络上发现这个HTTP服务器
+    // MDNS.addService("http", "tcp", 80);//这为"HTTP"服务添加了一个mDNS服务，使用TCP协议在端口80上，使其他设备能够在网络上发现这个HTTP服务器
       
-    web_server.begin();//启动了Web服务器，使其监听和响应传入的HTTP请求
+    // web_server.begin();//启动了Web服务器，使其监听和响应传入的HTTP请求
 }
 
 uint64_t last_micros = 0;
@@ -530,38 +538,82 @@ void loop()
     //Serial.println(openbci_data_buffer_tail);
     if (streaming_enabled == true)//如果使能传输流，则使用tcp传输
     {
-        uint64_t current_micros = micros();//获取当前微秒
-      
-        size_t tcp_write_size = wifi_latency / get_sample_delay();
+      if (WiFi.status() == WL_CONNECTED) {  // 检查WiFi连接
+            HTTPClient http;
+            http.begin(SERVER_URL);  // 初始化HTTP客户端并指定服务器URL
 
-        int16_t packets_to_write = openbci_data_buffer_tail - openbci_data_buffer_head;//有多少个包
-
-        if (packets_to_write < 0) packets_to_write += OPENBCI_DATA_BUFFER_SIZE;
-        
-        if ((last_micros + wifi_latency <= current_micros) || (packets_to_write >= tcp_write_size))//当tcp空间少于要写的包数量或者当前时间超出上一时间+wifi延迟
-        {              
-            if (openbci_data_buffer_head + packets_to_write >= OPENBCI_DATA_BUFFER_SIZE)
-            { 
-               size_t wrap_size = OPENBCI_DATA_BUFFER_SIZE - openbci_data_buffer_head;
-
-               memcpy(tcp_transfer_buffer, &openbci_data_buffer[openbci_data_buffer_head], wrap_size * sizeof(openbci_data_packet));
-               memcpy(tcp_transfer_buffer + (wrap_size * sizeof(openbci_data_packet)), &openbci_data_buffer, (packets_to_write - wrap_size) * sizeof(openbci_data_packet));
+            // 创建HTTP POST请求的正文
+            String httpRequestData = "";
+            for (int i = openbci_data_buffer_head; i < openbci_data_buffer_tail; i++) {
+                httpRequestData += "sample_number=";
+                httpRequestData += openbci_data_buffer[i].sample_number;
+                httpRequestData += "&channel_data=";
+                for (int j = 0; j < 24; j++) {
+                    httpRequestData += openbci_data_buffer[i].channel_data[j];
+                    httpRequestData += ",";
+                }
+                httpRequestData += "auxiliary_data=";
+                for (int j = 0; j < 6; j++) {
+                    httpRequestData += openbci_data_buffer[i].auxiliary_data[j];
+                    httpRequestData += ",";
+                }
+                httpRequestData += "footer=";
+                httpRequestData += openbci_data_buffer[i].footer;
+                if (i < openbci_data_buffer_tail - 1) httpRequestData += "&";
             }
 
-            else memcpy(tcp_transfer_buffer, &openbci_data_buffer[openbci_data_buffer_head], packets_to_write * sizeof(openbci_data_packet));
-            
-            tcp_client.write(tcp_transfer_buffer, packets_to_write * sizeof(openbci_data_packet)); //把tcp_transfer_buffer里的内容写给tcp客户端
-            #if 0
-            for (int i = 0; i < packets_to_write * sizeof(openbci_data_packet); i++)
-            {
-              printf("%x", *(tcp_transfer_buffer + i));
+            // 发送HTTP POST请求
+            int httpCode = http.POST(httpRequestData);
+
+            // 检查响应代码
+            if (httpCode > 0) {
+                String response = http.getString();  // 获取服务器响应
+                Serial.println(httpCode);
+                Serial.println(response);
+            } else {
+                Serial.print("Error code: ");
+                Serial.println(httpCode);
             }
-            #endif
+
+            // 重置缓冲区头指针
             openbci_data_buffer_head = openbci_data_buffer_tail;
 
-            last_micros = current_micros;
+            http.end();  // 关闭HTTP连接
+        } else {
+            Serial.println("WiFi not connected.");
         }
+    //     uint64_t current_micros = micros();//获取当前微秒
+      
+    //     size_t tcp_write_size = wifi_latency / get_sample_delay();
+
+    //     int16_t packets_to_write = openbci_data_buffer_tail - openbci_data_buffer_head;//有多少个包
+
+    //     if (packets_to_write < 0) packets_to_write += OPENBCI_DATA_BUFFER_SIZE;
+        
+    //     if ((last_micros + wifi_latency <= current_micros) || (packets_to_write >= tcp_write_size))//当tcp空间少于要写的包数量或者当前时间超出上一时间+wifi延迟
+    //     {              
+    //         if (openbci_data_buffer_head + packets_to_write >= OPENBCI_DATA_BUFFER_SIZE)
+    //         { 
+    //            size_t wrap_size = OPENBCI_DATA_BUFFER_SIZE - openbci_data_buffer_head;
+
+    //            memcpy(tcp_transfer_buffer, &openbci_data_buffer[openbci_data_buffer_head], wrap_size * sizeof(openbci_data_packet));
+    //            memcpy(tcp_transfer_buffer + (wrap_size * sizeof(openbci_data_packet)), &openbci_data_buffer, (packets_to_write - wrap_size) * sizeof(openbci_data_packet));
+    //         }
+
+    //         else memcpy(tcp_transfer_buffer, &openbci_data_buffer[openbci_data_buffer_head], packets_to_write * sizeof(openbci_data_packet));
+            
+    //         tcp_client.write(tcp_transfer_buffer, packets_to_write * sizeof(openbci_data_packet)); //把tcp_transfer_buffer里的内容写给tcp客户端
+    //         #if 0
+    //         for (int i = 0; i < packets_to_write * sizeof(openbci_data_packet); i++)
+    //         {
+    //           printf("%x", *(tcp_transfer_buffer + i));
+    //         }
+    //         #endif
+    //         openbci_data_buffer_head = openbci_data_buffer_tail;
+
+    //         last_micros = current_micros;
+    //     }
     }
     
-    web_server.handleClient();
+    // // web_server.handleClient();
 }
