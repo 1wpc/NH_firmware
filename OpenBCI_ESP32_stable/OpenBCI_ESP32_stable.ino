@@ -26,7 +26,7 @@
 
 #define JSON_BUFFER_SIZE 1024
 
-#define SERVER_URL "http://10.153.213.202"  // 替换为您的服务器URL
+#define SERVER_URL "http://192.168.43.234:8000/post"  // 替换为您的服务器URL
 
 enum ads1299_command : uint8_t        //ADS1299控制字：
 {
@@ -103,7 +103,7 @@ uint8_t channel_setting_buffer[8] = {0};
 
 uint8_t sample_counter = 0;
 
-bool streaming_enabled = false;
+bool streaming_enabled = true;
 
 uint8_t* tcp_transfer_buffer = NULL;
 
@@ -535,16 +535,15 @@ uint64_t last_micros = 0;
 
 void loop()
 {
-    //Serial.println(openbci_data_buffer_tail);
-    if (streaming_enabled == true)//如果使能传输流，则使用tcp传输
-    {
-      if (WiFi.status() == WL_CONNECTED) {  // 检查WiFi连接
+  if (WiFi.status() == WL_CONNECTED) {  // 检查WiFi连接
             HTTPClient http;
             http.begin(SERVER_URL);  // 初始化HTTP客户端并指定服务器URL
+            // http.addHeader("Content-Type", "application/json");
 
             // 创建HTTP POST请求的正文
             String httpRequestData = "";
             for (int i = openbci_data_buffer_head; i < openbci_data_buffer_tail; i++) {
+              Serial.println("for");
                 httpRequestData += "sample_number=";
                 httpRequestData += openbci_data_buffer[i].sample_number;
                 httpRequestData += "&channel_data=";
@@ -564,6 +563,7 @@ void loop()
 
             // 发送HTTP POST请求
             int httpCode = http.POST(httpRequestData);
+            Serial.print(httpRequestData);
 
             // 检查响应代码
             if (httpCode > 0) {
@@ -582,6 +582,11 @@ void loop()
         } else {
             Serial.println("WiFi not connected.");
         }
+        // delay(5000);
+    //Serial.println(openbci_data_buffer_tail);
+    // if (streaming_enabled == true)//如果使能传输流，则使用tcp传输
+    // {
+      
     //     uint64_t current_micros = micros();//获取当前微秒
       
     //     size_t tcp_write_size = wifi_latency / get_sample_delay();
@@ -613,7 +618,7 @@ void loop()
 
     //         last_micros = current_micros;
     //     }
-    }
+    // }
     
     // // web_server.handleClient();
 }
