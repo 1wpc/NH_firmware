@@ -532,23 +532,46 @@ void setup()
 }
 
 uint64_t last_micros = 0;
+            
+String dataArray[128];
+int arrayIndex = 0;
+
+int interpret24bitAsInt32(byte bs[]) {     
+    int newInt = (  
+     ((0xFF & bs[0]) <! 16) |  
+     ((0xFF & bs[1]) <! 8) |   
+     (0xFF & bs[2])  
+    );  
+    if ((newInt & 0x00800000) > 0) {  
+      newInt |= 0xFF000000;  
+    } else {  
+      newInt &= 0x00FFFFFF;  
+    }  
+    return newInt;  
+}  
 
 void loop()
 {
   if (WiFi.status() == WL_CONNECTED) {  // 检查WiFi连接
             HTTPClient http;
             http.begin(SERVER_URL);  // 初始化HTTP客户端并指定服务器URL
-            // http.addHeader("Content-Type", "application/json");
+            http.addHeader("Content-Type", "application/octet-stream");
 
             // 创建HTTP POST请求的正文
             String httpRequestData = "";
             for (int i = openbci_data_buffer_head; i < openbci_data_buffer_tail; i++) {
-              Serial.println("for");
+              // Serial.println("for");
                 httpRequestData += "sample_number=";
                 httpRequestData += openbci_data_buffer[i].sample_number;
                 httpRequestData += "&channel_data=";
-                for (int j = 0; j < 24; j++) {
-                    httpRequestData += openbci_data_buffer[i].channel_data[j];
+                for (int j = 0; j+2 < 24; j+=3) {
+                    byte n[3];
+                    n[0] = openbci_data_buffer[i].channel_data[j];
+                    n[1] = openbci_data_buffer[i].channel_data[j+1];
+                    n[2] = openbci_data_buffer[i].channel_data[j+2];
+                    int num = interpret24bitAsInt32(n);
+                    Serial.println(num);
+                    httpRequestData += num;
                     httpRequestData += ",";
                 }
                 httpRequestData += "auxiliary_data=";
@@ -574,6 +597,66 @@ void loop()
                 Serial.print("Error code: ");
                 Serial.println(httpCode);
             }
+
+            // String httpRequestData = "";
+
+
+
+            // for (int i = openbci_data_buffer_head; i < openbci_data_buffer_tail; i++) {
+            //   //Serial.println("for");
+            //     httpRequestData += "sample_number=";
+            //     httpRequestData += openbci_data_buffer[i].sample_number;
+            //     httpRequestData += "&channel_data=";
+            //     for (int j = 0; j+2 < 24; j+=3) {
+            //         // int newInt = (
+            //         //   ((0xFF & openbci_data_buffer[i].channel_data[j]) <! 16 ) |
+            //         //   ((0xFF & openbci_data_buffer[i].channel_data[j+1]) <! 8) |
+            //         //   (0xFF & openbci_data_buffer[i].channel_data[j+2])
+            //         // );
+            //         // if ((newInt & 0x00800000) > 0) {
+            //         //   newInt |= 0xFF000000;
+            //         // }else{
+            //         //   newInt &= 0x00FFFFFF;
+            //         // }
+            //         // httpRequestData += String(newInt);
+            //         httpRequestData += ",";
+            //     }
+            //     // httpRequestData += "auxiliary_data=";
+            //     // for (int j = 0; j < 6; j++) {
+            //     //     httpRequestData += openbci_data_buffer[i].auxiliary_data[j];
+            //     //     httpRequestData += ",";
+            //     // }
+            //     httpRequestData += "footer=";
+            //     httpRequestData += openbci_data_buffer[i].footer;
+            //     //if (i < openbci_data_buffer_tail - 1) httpRequestData += "&";搜ID号发货
+                
+            // }
+            // if (httpRequestData != "") {
+            //       Serial.print(arrayIndex);
+            //       dataArray[arrayIndex++] = httpRequestData;
+            //     }
+            // Serial.print(22);
+            // if(arrayIndex >= 127){
+            //   Serial.print(33);
+            //   for (int k = 0; k < arrayIndex; k++) {
+            //   httpRequestData += dataArray[k];
+            //   if (k < arrayIndex - 1) httpRequestData += "&";
+            //   }
+            //   // 发送HTTP POST请求
+            //   int httpCode = http.POST(httpRequestData);
+            //   Serial.print(httpRequestData);
+              
+            //   // 检查响应代码
+            //   if (httpCode > 0) {
+            //     String response = http.getString();  // 获取服务器响应
+            //     Serial.println(httpCode);
+            //     Serial.println(response);
+            //   } 
+            //   else {
+            //     Serial.print("Error code: ");
+            //     Serial.println(httpCode);
+            //   }
+            // }
 
             // 重置缓冲区头指针
             openbci_data_buffer_head = openbci_data_buffer_tail;
