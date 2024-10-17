@@ -550,6 +550,12 @@ int interpret24bitAsInt32(byte bs[]) {
     return newInt;  
 }  
 
+
+
+
+int buffer[8][128];
+int workhard[8];
+
 void loop()
 {
   if (WiFi.status() == WL_CONNECTED) {  // 检查WiFi连接
@@ -564,16 +570,21 @@ void loop()
                 httpRequestData += "sample_number=";
                 httpRequestData += openbci_data_buffer[i].sample_number;
                 httpRequestData += "&channel_data=";
+    
                 for (int j = 0; j+2 < 24; j+=3) {
                     byte n[3];
                     n[0] = openbci_data_buffer[i].channel_data[j];
                     n[1] = openbci_data_buffer[i].channel_data[j+1];
                     n[2] = openbci_data_buffer[i].channel_data[j+2];
                     int num = interpret24bitAsInt32(n);
-                    Serial.println(num);
+                     //Serial.println(num);
                     httpRequestData += num;
                     httpRequestData += ",";
+                    for (int i = 0; i < 8; i++){
+                        workhard[i]=num;
+                    }                   
                 }
+              
                 httpRequestData += "auxiliary_data=";
                 for (int j = 0; j < 6; j++) {
                     httpRequestData += openbci_data_buffer[i].auxiliary_data[j];
@@ -582,21 +593,28 @@ void loop()
                 httpRequestData += "footer=";
                 httpRequestData += openbci_data_buffer[i].footer;
                 if (i < openbci_data_buffer_tail - 1) httpRequestData += "&";
+                if (httpRequestData != "") {
+                  //Serial.print(arrayIndex);
+                  dataArray[arrayIndex++] = httpRequestData;
+                }
+                for (int i = 0;i < 8; i++){
+                    buffer[i][arrayIndex]=workhard[i];
+                }
             }
 
             // 发送HTTP POST请求
-            int httpCode = http.POST(httpRequestData);
-            Serial.print(httpRequestData);
+            // int httpCode = http.POST(httpRequestData);
+            // Serial.print(httpRequestData);
 
-            // 检查响应代码
-            if (httpCode > 0) {
-                String response = http.getString();  // 获取服务器响应
-                Serial.println(httpCode);
-                Serial.println(response);
-            } else {
-                Serial.print("Error code: ");
-                Serial.println(httpCode);
-            }
+            // // 检查响应代码
+            // if (httpCode > 0) {
+            //     String response = http.getString();  // 获取服务器响应
+            //     Serial.println(httpCode);
+            //     Serial.println(response);
+            // } else {
+            //     Serial.print("Error code: ");
+            //     Serial.println(httpCode);
+            // }
 
             // String httpRequestData = "";
 
@@ -631,40 +649,96 @@ void loop()
             //     //if (i < openbci_data_buffer_tail - 1) httpRequestData += "&";搜ID号发货
                 
             // }
-            // if (httpRequestData != "") {
-            //       Serial.print(arrayIndex);
-            //       dataArray[arrayIndex++] = httpRequestData;
-            //     }
-            // Serial.print(22);
-            // if(arrayIndex >= 127){
-            //   Serial.print(33);
-            //   for (int k = 0; k < arrayIndex; k++) {
-            //   httpRequestData += dataArray[k];
-            //   if (k < arrayIndex - 1) httpRequestData += "&";
-            //   }
-            //   // 发送HTTP POST请求
-            //   int httpCode = http.POST(httpRequestData);
-            //   Serial.print(httpRequestData);
+            
+            //Serial.print(22);
+        if(arrayIndex >= 127){
+              arrayIndex = 0;
+              //Serial.print(33);
+              // for (int k = 0; k < arrayIndex; k++) {
+              // httpRequestData += dataArray[k];
+              //   if (k < arrayIndex - 1) httpRequestData += "&";
+              // }
+            // 创建一个 JSON 文档
+            StaticJsonDocument<2048> doc;
+            JsonArray main = doc["data"].to<JsonArray>();
+            
+            //JsonArray dataArr = doc.createNestedArray("data");
+              JsonArray main_0 =main.add<JsonArray>();
+              for (int j=0; j<128; j++){
+                main_0.add(buffer[0][j]);
+              }
+              JsonArray main_1 =main.add<JsonArray>();
+              for (int j=0; j<128; j++){
+                main_0.add(buffer[1][j]);
+              }
+              JsonArray main_2 =main.add<JsonArray>();
+              for (int j=0; j<128; j++){
+                main_0.add(buffer[2][j]);
+              }
+              JsonArray main_3 =main.add<JsonArray>();
+              for (int j=0; j<128; j++){
+                main_0.add(buffer[3][j]);
+              }
+              JsonArray main_4 =main.add<JsonArray>();
+              for (int j=0; j<128; j++){
+                main_0.add(buffer[4][j]);
+              }
+              JsonArray main_5 =main.add<JsonArray>();
+              for (int j=0; j<128; j++){
+                main_0.add(buffer[5][j]);
+              }
+              JsonArray main_6 =main.add<JsonArray>();
+              for (int j=0; j<128; j++){
+                main_0.add(buffer[6][j]);
+              }
+              JsonArray main_7 =main.add<JsonArray>();
+              for (int j=0; j<128; j++){
+                main_0.add(buffer[7][j]);
+              }
+
               
-            //   // 检查响应代码
-            //   if (httpCode > 0) {
-            //     String response = http.getString();  // 获取服务器响应
-            //     Serial.println(httpCode);
-            //     Serial.println(response);
-            //   } 
-            //   else {
-            //     Serial.print("Error code: ");
-            //     Serial.println(httpCode);
-            //   }
-            // }
+              // Serial.println(subArr.size());
+            
+            // Serial.println(dataArr.isNull());
+
+            //json_object["data"] = dataArr;
+
+            // 将 JSON 文档序列化为字符串
+               String jsonStr = "";
+               serializeJson(doc, jsonStr);
+
+           // 发送 JSON 字符串（假设你有发送的方法，这里只是模拟输出）
+               Serial.println(jsonStr);
+            
+
+              
+            
+              // 发送HTTP POST请求
+              int httpCode = http.POST(jsonStr);
+              Serial.print(jsonStr);
+              
+              // 检查响应代码
+                 if (httpCode > 0) {
+                   String response = http.getString();  // 获取服务器响应
+                    Serial.println(httpCode);
+                    Serial.println(response);
+                  } 
+                  else {
+                    Serial.print("Error code: ");
+                   Serial.println(httpCode);
+                  }
+               
 
             // 重置缓冲区头指针
-            openbci_data_buffer_head = openbci_data_buffer_tail;
+               openbci_data_buffer_head = openbci_data_buffer_tail;
 
-            http.end();  // 关闭HTTP连接
-        } else {
-            Serial.println("WiFi not connected.");
+                http.end();  // 关闭HTTP连接
         }
+              else {
+               Serial.println("WiFi not connected.");
+             }
+
+         
         // delay(5000);
     //Serial.println(openbci_data_buffer_tail);
     // if (streaming_enabled == true)//如果使能传输流，则使用tcp传输
@@ -704,4 +778,5 @@ void loop()
     // }
     
     // // web_server.handleClient();
+    }
 }
