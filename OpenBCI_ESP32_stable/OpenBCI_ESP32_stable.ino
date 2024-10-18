@@ -26,7 +26,7 @@
 
 #define JSON_BUFFER_SIZE 1024
 
-#define SERVER_URL "http://192.168.43.234:8000/post"  // 替换为您的服务器URL
+#define SERVER_URL "http://192.168.107.184:8000/post"  // 替换为您的服务器URL
 
 enum ads1299_command : uint8_t        //ADS1299控制字：
 {
@@ -493,7 +493,7 @@ void setup()
     delayMicroseconds(50);
 
     WiFi.mode(WIFI_STA);
-    WiFi.begin("areyouok", "wpc990601");
+    WiFi.begin("areyoushit", "wpc990601");
 
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
@@ -561,7 +561,7 @@ void loop()
   if (WiFi.status() == WL_CONNECTED) {  // 检查WiFi连接
             HTTPClient http;
             http.begin(SERVER_URL);  // 初始化HTTP客户端并指定服务器URL
-            http.addHeader("Content-Type", "application/octet-stream");
+            http.addHeader("Content-Type", "text/plain");
 
             // 创建HTTP POST请求的正文
             String httpRequestData = "";
@@ -599,7 +599,7 @@ void loop()
                 }
                 for (int i = 0;i < 8; i++){
                     buffer[i][arrayIndex]=workhard[i];
-                }
+                }httpRequestData = "";
             }
 
             // 发送HTTP POST请求
@@ -659,7 +659,7 @@ void loop()
               //   if (k < arrayIndex - 1) httpRequestData += "&";
               // }
             // 创建一个 JSON 文档
-            StaticJsonDocument<2048> doc;
+            StaticJsonDocument<4096> doc;
             JsonArray main = doc["data"].to<JsonArray>();
             
             //JsonArray dataArr = doc.createNestedArray("data");
@@ -669,31 +669,31 @@ void loop()
               }
               JsonArray main_1 =main.add<JsonArray>();
               for (int j=0; j<128; j++){
-                main_0.add(buffer[1][j]);
+                main_1.add(buffer[1][j]);
               }
               JsonArray main_2 =main.add<JsonArray>();
               for (int j=0; j<128; j++){
-                main_0.add(buffer[2][j]);
+                main_2.add(buffer[2][j]);
               }
               JsonArray main_3 =main.add<JsonArray>();
               for (int j=0; j<128; j++){
-                main_0.add(buffer[3][j]);
+                main_3.add(buffer[3][j]);
               }
               JsonArray main_4 =main.add<JsonArray>();
               for (int j=0; j<128; j++){
-                main_0.add(buffer[4][j]);
+                main_4.add(buffer[4][j]);
               }
               JsonArray main_5 =main.add<JsonArray>();
               for (int j=0; j<128; j++){
-                main_0.add(buffer[5][j]);
+                main_5.add(buffer[5][j]);
               }
               JsonArray main_6 =main.add<JsonArray>();
               for (int j=0; j<128; j++){
-                main_0.add(buffer[6][j]);
+                main_6.add(buffer[6][j]);
               }
               JsonArray main_7 =main.add<JsonArray>();
               for (int j=0; j<128; j++){
-                main_0.add(buffer[7][j]);
+                main_7.add(buffer[7][j]);
               }
 
               
@@ -715,7 +715,6 @@ void loop()
             
               // 发送HTTP POST请求
               int httpCode = http.POST(jsonStr);
-              Serial.print(jsonStr);
               
               // 检查响应代码
                  if (httpCode > 0) {
@@ -729,15 +728,17 @@ void loop()
                   }
                
 
-            // 重置缓冲区头指针
-               openbci_data_buffer_head = openbci_data_buffer_tail;
+            
 
                 http.end();  // 关闭HTTP连接
-        }
-              else {
+          }
+              
+  }
+          else {
                Serial.println("WiFi not connected.");
              }
-
+             // 重置缓冲区头指针
+               openbci_data_buffer_head = openbci_data_buffer_tail;
          
         // delay(5000);
     //Serial.println(openbci_data_buffer_tail);
@@ -778,5 +779,5 @@ void loop()
     // }
     
     // // web_server.handleClient();
-    }
+    
 }
